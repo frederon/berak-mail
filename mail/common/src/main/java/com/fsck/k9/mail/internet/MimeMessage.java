@@ -645,4 +645,12 @@ public class MimeMessage extends Message {
         }
         return new MimeBodyPart(contentHeaders, getBody());
     }
+
+    // Berak stuff
+    public String getBodyString() throws MessagingException, IOException {
+        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+        mBody.writeTo(outputStream);
+
+        return outputStream.toString();
+    }
 }

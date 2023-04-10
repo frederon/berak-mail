@@ -168,4 +168,7 @@ public abstract class Message implements Part, Body {
         }
         return 0;
     }
+
+    // Berak stuffs
+    public abstract String getBodyString() throws MessagingException, IOException;
 }

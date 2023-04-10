@@ -24,6 +24,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import android.content.Context;
 import android.os.Process;
 import android.os.SystemClock;
+import android.util.Log;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.VisibleForTesting;
@@ -53,6 +54,7 @@ import com.fsck.k9.core.BuildConfig;
 import com.fsck.k9.helper.MutableBoolean;
 import com.fsck.k9.mail.AuthType;
 import com.fsck.k9.mail.AuthenticationFailedException;
+import com.fsck.k9.mail.BodyPart;
 import com.fsck.k9.mail.CertificateValidationException;
 import com.fsck.k9.mail.FetchProfile;
 import com.fsck.k9.mail.Flag;
@@ -60,8 +62,12 @@ import com.fsck.k9.mail.FolderClass;
 import com.fsck.k9.mail.Message;
 import com.fsck.k9.mail.MessageDownloadState;
 import com.fsck.k9.mail.MessagingException;
+import com.fsck.k9.mail.Multipart;
 import com.fsck.k9.mail.Part;
 import com.fsck.k9.mail.ServerSettings;
+import com.fsck.k9.mail.internet.MimeMessage;
+import com.fsck.k9.mail.internet.MimeUtility;
+import com.fsck.k9.mail.internet.TextBody;
 import com.fsck.k9.mail.power.PowerManager;
 import com.fsck.k9.mail.power.WakeLock;
 import com.fsck.k9.mailstore.FolderDetailsAccessor;
@@ -81,6 +87,7 @@ import com.fsck.k9.mailstore.SpecialLocalFoldersCreator;
 import com.fsck.k9.notification.NotificationController;
 import com.fsck.k9.notification.NotificationStrategy;
 import com.fsck.k9.search.LocalSearch;
+import org.apache.james.mime4j.util.MimeUtil;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import timber.log.Timber;
@@ -1366,7 +1373,13 @@ public class MessagingController {
      * Stores the given message in the Outbox and starts a sendPendingMessages command to attempt to send the message.
      */
     public void sendMessage(Account account, Message message, String plaintextSubject, MessagingListener listener) {
+        encryptMessage((MimeMessage) message);
+
         try {
+            Log.d("berak", message.getBodyString());
+            Log.d("berak", getText(message, "text/html"));
+            Log.d("berak", getText(message, "text/plain"));
+
             Long outboxFolderId = account.getOutboxFolderId();
             if (outboxFolderId == null) {
                 if (BuildConfig.DEBUG) {
@@ -2687,5 +2700,73 @@ public class MessagingController {
 
     private enum MoveOrCopyFlavor {
         MOVE, COPY, MOVE_AND_MARK_AS_READ
+    }
+
+    // CUSTOM
+
+    private static String getText(Part part, String contentType) {
+        if (part.getBody() instanceof TextBody && part.getMimeType().equalsIgnoreCase(contentType)) {
+            return ((TextBody) part.getBody()).getRawText();
+        }
+
+        if (part.getBody() instanceof Multipart) {
+            Multipart multipart = (Multipart) part.getBody();
+            for (int i = 0; i < multipart.getCount(); i++) {
+                BodyPart bodyPart = multipart.getBodyPart(i);
+                String text = getText(bodyPart, contentType);
+                if (text != null) {
+                    return text;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private MimeMessage encryptMessage(MimeMessage originalMessage) {
+        // Get the plaintext part of the original message
+        String originalPlainText = getText(originalMessage, "text/plain");
+        String originalHtmlPlainText = getText(originalMessage, "text/html");
+
+        if (originalPlainText != null) {
+            String encryptedText = reverseString(originalPlainText);
+            TextBody encryptedTextBody = new TextBody(encryptedText);
+            encryptedTextBody.setEncoding(MimeUtil.ENC_8BIT);
+            updateMessagePart(originalMessage, encryptedTextBody, "text/plain");
+        }
+
+        if (originalHtmlPlainText != null) {
+            String encryptedText = reverseString(originalHtmlPlainText);
+            TextBody encryptedTextBody = new TextBody(encryptedText);
+            encryptedTextBody.setEncoding(MimeUtil.ENC_8BIT);
+            updateMessagePart(originalMessage, encryptedTextBody, "text/html");
+        }
+
+        return originalMessage;
+    }
+
+    private void updateMessagePart(Part part, TextBody newPlainTextBody, String contentType){
+        if (part.getBody() instanceof TextBody && part.getMimeType().equalsIgnoreCase(contentType)) {
+            part.setBody(newPlainTextBody);
+            return;
+        }
+
+        if (part.getBody() instanceof Multipart) {
+            Multipart multipart = (Multipart) part.getBody();
+            for (int i = 0; i < multipart.getCount(); i++) {
+                BodyPart bodyPart = multipart.getBodyPart(i);
+                updateMessagePart(bodyPart, newPlainTextBody, contentType);
+            }
+        }
+    }
+
+    private String reverseString(String original){
+        StringBuilder builder = new StringBuilder();
+
+        builder.append(original);
+
+        builder.reverse();
+
+        return builder.toString();
     }
 }
