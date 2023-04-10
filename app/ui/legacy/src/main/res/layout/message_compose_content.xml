@@ -25,17 +25,16 @@
 
             <EditText
                 android:id="@+id/subject"
+                style="@style/ComposeEditTextLarge"
                 android:layout_width="fill_parent"
                 android:layout_height="wrap_content"
-                android:hint="@string/message_compose_subject_hint"
-                android:inputType="textEmailSubject|textAutoCorrect|textCapSentences"
-                android:imeOptions="actionNext|flagNoExtractUi"
-                android:singleLine="true"
                 android:background="@android:color/transparent"
+                android:hint="@string/message_compose_subject_hint"
+                android:imeOptions="actionNext|flagNoExtractUi"
+                android:inputType="textEmailSubject|textAutoCorrect|textCapSentences"
                 android:paddingTop="10dp"
                 android:paddingBottom="10dp"
-                style="@style/ComposeEditTextLarge"
-                />
+                android:singleLine="true" />
         </LinearLayout>
 
         <View
@@ -149,6 +148,49 @@
             android:layout_marginTop="8dp"
             android:layout_marginBottom="8dp"
             android:orientation="vertical" />
+
+        <Switch
+            android:id="@+id/switch_encryption"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/message_compose_switch_encrypt" />
+
+        <EditText
+            android:id="@+id/encryption_key"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="top"
+            android:hint="@string/message_compose_encryption_key_hint"
+            android:imeOptions="flagNoExtractUi"
+            android:inputType="textMultiLine|textAutoCorrect|textCapSentences"
+            android:minLines="0"
+            android:textAppearance="?android:attr/textAppearanceMedium"
+            android:visibility="gone" />
+
+        <Switch
+            android:id="@+id/switch_digitalsign"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/message_compose_switch_digitalsign" />
+
+        <EditText
+            android:id="@+id/digitalsign_private_key"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="top"
+            android:hint="@string/message_compose_digitalsign_key_hint"
+            android:imeOptions="flagNoExtractUi"
+            android:inputType="textMultiLine|textAutoCorrect|textCapSentences"
+            android:minLines="0"
+            android:textAppearance="?android:attr/textAppearanceMedium"
+            android:visibility="gone" />
+
+        <Button
+            android:id="@+id/button_file_digitalsign_private_key"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/file_digitalsign_private_key"
+            android:visibility="gone" />
 
     </LinearLayout>
 

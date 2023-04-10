@@ -1343,4 +1343,9 @@ You can keep this message and use it as a backup for your secret key. If you wan
     <string name="clipboard_label_email_address">Email address</string>
     <!-- A user visible label for the name and email address copied to the clipboard -->
     <string name="clipboard_label_name_and_email_address">Name and email address</string>
+    <string name="message_compose_switch_encrypt">Use Encryption</string>
+    <string name="message_compose_switch_digitalsign">Use Digital Signature</string>
+    <string name="message_compose_encryption_key_hint">Encryption Key</string>
+    <string name="message_compose_digitalsign_key_hint">Digital Signature Private Key</string>
+    <string name="file_digitalsign_private_key">Select File for Digital Signature Private Key</string>
 </resources>
