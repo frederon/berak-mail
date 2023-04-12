@@ -36,4 +36,20 @@ public class EllipticCurveDigitalSignature {
 
         return p3.x == signature.r;
     }
+
+    public static Point getPublicKey(BigInteger privateKey){
+        // public key is the generator function multiplied by the private key
+        return ec.multiply(privateKey);
+    }
+
+    public static String getPublicKeyString(Point publicKey){
+        // Convert x and y values of the public key to hexadecimal of length 64
+        String x = publicKey.x.toString(16);
+        x = String.format("%64s", x).replace(' ', '0');
+
+        String y = publicKey.y.toString(16);
+        y = String.format("%64s", y).replace(' ', '0');
+
+        return "04" + x + y;
+    }
 }
