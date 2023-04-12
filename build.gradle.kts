@@ -1,5 +1,10 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
+buildscript {
+    dependencies {
+        classpath("com.android.tools.build:gradle:7.4.2")
+    }
+}
 @Suppress("DSL_SCOPE_VIOLATION")
 plugins {
     alias(libs.plugins.android.application) apply false

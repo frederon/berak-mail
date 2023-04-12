@@ -1,7 +1,12 @@
 package com.fsck.k9.activity;
 
 
+import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
@@ -40,9 +45,12 @@ import android.view.View.OnClickListener;
 import android.view.View.OnFocusChangeListener;
 import android.view.ViewStub;
 import android.view.Window;
+import android.widget.Button;
+import android.widget.CompoundButton;
 import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -243,6 +251,59 @@ public class MessageCompose extends K9Activity implements OnClickListener,
     private boolean navigateUp;
 
     private boolean sendMessageHasBeenTriggered = false;
+
+    private static final int REQUEST_CODE_PICK_PRIVATE_KEY_FILE = 1;
+
+    private void openFilePicker() {
+        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        intent.setType("text/plain");
+
+        startActivityForResult(intent, REQUEST_CODE_PICK_PRIVATE_KEY_FILE);
+    }
+
+    private void onBerakCreate(Bundle savedInstanceState) {
+        @SuppressLint("UseSwitchCompatOrMaterialCode") Switch switchEncryption = findViewById(R.id.switch_encryption);
+        EditText encryptionKey = findViewById(R.id.encryption_key);
+
+        @SuppressLint("UseSwitchCompatOrMaterialCode") Switch switchDigitalSign = findViewById(R.id.switch_digitalsign);
+        EditText digitalSignPrivateKey = findViewById(R.id.digitalsign_private_key);
+        Button buttonFileDigitalSignPrivateKey = findViewById(R.id.button_file_digitalsign_private_key);
+
+        switchEncryption.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
+            @Override
+            public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
+                if (isChecked) {
+                    encryptionKey.setVisibility(View.VISIBLE);
+                } else {
+                    encryptionKey.setVisibility(View.GONE);
+                }
+            }
+        });
+
+        // Set up the click listener for switchDigitalSign
+        switchDigitalSign.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
+            @Override
+            public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
+                if (isChecked) {
+                    digitalSignPrivateKey.setVisibility(View.VISIBLE);
+                    buttonFileDigitalSignPrivateKey.setVisibility(View.VISIBLE);
+                } else {
+                    digitalSignPrivateKey.setVisibility(View.GONE);
+                    buttonFileDigitalSignPrivateKey.setVisibility(View.GONE);
+                }
+            }
+        });
+
+        // Set up the click listener for buttonFileDigitalSignPrivateKey
+        buttonFileDigitalSignPrivateKey.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                openFilePicker();
+            }
+        });
+
+    }
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -488,6 +549,8 @@ public class MessageCompose extends K9Activity implements OnClickListener,
         if (savedInstanceState == null) {
             checkAndRequestPermissions();
         }
+
+        this.onBerakCreate(savedInstanceState);
     }
 
     /**
@@ -851,8 +914,40 @@ public class MessageCompose extends K9Activity implements OnClickListener,
         startActivityForResult(ContactIntentHelper.getContactPickerIntent(), requestCode);
     }
 
+    private void loadPrivateKeyFromFile(Uri privateKeyFileUri) {
+        try {
+            InputStream inputStream = getContentResolver().openInputStream(privateKeyFileUri);
+            if (inputStream != null) {
+                BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream));
+                StringBuilder content = new StringBuilder();
+                String line;
+
+                while ((line = reader.readLine()) != null) {
+                    content.append(line).append('\n');
+                }
+
+                reader.close();
+                inputStream.close();
+
+                EditText digitalSignPrivateKey = findViewById(R.id.digitalsign_private_key);
+                digitalSignPrivateKey.setText(content.toString());
+            }
+        } catch (FileNotFoundException e) {
+            Toast.makeText(this, "File not found", Toast.LENGTH_SHORT).show();
+        } catch (IOException e) {
+            Toast.makeText(this, "Error reading file", Toast.LENGTH_SHORT).show();
+        }
+    }
+
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        if (requestCode == REQUEST_CODE_PICK_PRIVATE_KEY_FILE && resultCode == RESULT_OK && data != null) {
+            Uri privateKeyFileUri = data.getData();
+            if (privateKeyFileUri != null) {
+                loadPrivateKeyFromFile(privateKeyFileUri);
+            }
+        }
+
         isInSubActivity = false;
 
         // Only if none of the high 16 bits are set it might be one of our request codes
