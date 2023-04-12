@@ -14,6 +14,8 @@ public class EllipticCurve {
     private BigInteger gx = new BigInteger("55066263022277343669578718895168534326250603453777594175500187360389116729240");
     private BigInteger gy = new BigInteger("32670510020758816978083085130507043184471273380659243275938904335757337482424");
 
+    public BigInteger n = new BigInteger("115792089237316195423570985008687907852837564279074904382605163141518161494337");
+
     private Point doublePoint(Point p){
         // slope = (3x₁² + a) / 2y₁
         BigInteger slope = ((p.x.pow(2).multiply(new BigInteger("3")).add(this.a)).multiply(p.y.multiply(new BigInteger("2")).modInverse(this.prime))).mod(this.prime);
@@ -63,5 +65,10 @@ public class EllipticCurve {
         }
 
         return current;
+    }
+
+    public Point multiply(BigInteger k){
+        Point generator = new Point(this.gx, this.gy);
+        return multiply(k, generator);
     }
 }
