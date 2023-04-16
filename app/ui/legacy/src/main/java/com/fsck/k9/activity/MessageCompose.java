@@ -1566,9 +1566,14 @@ public class MessageCompose extends K9Activity implements OnClickListener,
         final MessageReference messageReference;
         final Flag flag;
 
+        // Berak attributes
+        final String encryptionKey;
+        final String digitalSignPrivateKey;
+
+
         SendMessageTask(MessagingController messagingController, Preferences preferences, Account account,
                 Contacts contacts, Message message, Long draftId, String plaintextSubject,
-                MessageReference messageReference, Flag flag) {
+                MessageReference messageReference, Flag flag, String encryptionKey, String digitalSignPrivateKey) {
             this.messagingController = messagingController;
             this.preferences = preferences;
             this.account = account;
@@ -1578,6 +1583,8 @@ public class MessageCompose extends K9Activity implements OnClickListener,
             this.plaintextSubject = plaintextSubject;
             this.messageReference = messageReference;
             this.flag = flag;
+            this.encryptionKey = encryptionKey;
+            this.digitalSignPrivateKey = digitalSignPrivateKey;
         }
 
         @Override
@@ -1591,7 +1598,14 @@ public class MessageCompose extends K9Activity implements OnClickListener,
                 Timber.e(e, "Failed to mark contact as contacted.");
             }
 
-            messagingController.sendMessage(account, message, plaintextSubject, null);
+            messagingController.sendMessage(
+                account,
+                message,
+                plaintextSubject,
+                null,
+                encryptionKey,
+                digitalSignPrivateKey
+            );
             if (draftId != null) {
                 // TODO set draft id to invalid in MessageCompose!
                 messagingController.deleteDraftSkippingTrashFolder(account, draftId);
@@ -1688,6 +1702,22 @@ public class MessageCompose extends K9Activity implements OnClickListener,
         String plaintextSubject =
                 (currentMessageBuilder instanceof PgpMessageBuilder) ? currentMessageBuilder.getSubject() : null;
 
+        // Berak stuff
+        String encryptionKey = null;
+        String digitalSignPrivateKey = null;
+
+        @SuppressLint("UseSwitchCompatOrMaterialCode") Switch switchEncryption = findViewById(R.id.switch_encryption);
+        if (switchEncryption.isChecked()) {
+            EditText encryptionKeyComponent = findViewById(R.id.encryption_key);
+            encryptionKey = encryptionKeyComponent.getText().toString();
+        }
+
+        @SuppressLint("UseSwitchCompatOrMaterialCode") Switch switchDigitalSign = findViewById(R.id.switch_digitalsign);
+        if (switchDigitalSign.isChecked()) {
+            EditText digitalSignPrivateKeyComponent = findViewById(R.id.digitalsign_private_key);
+            digitalSignPrivateKey = digitalSignPrivateKeyComponent.getText().toString();
+        }
+
         if (isDraft) {
             changesMadeSinceLastSave = false;
             currentMessageBuilder = null;
@@ -1702,7 +1732,8 @@ public class MessageCompose extends K9Activity implements OnClickListener,
         } else {
             currentMessageBuilder = null;
             new SendMessageTask(messagingController, preferences, account, contacts, message,
-                    draftMessageId, plaintextSubject, relatedMessageReference, relatedFlag).execute();
+                draftMessageId, plaintextSubject, relatedMessageReference, relatedFlag,
+                encryptionKey, digitalSignPrivateKey).execute();
             finish();
         }
     }

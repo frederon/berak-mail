@@ -1372,10 +1372,20 @@ public class MessagingController {
     /**
      * Stores the given message in the Outbox and starts a sendPendingMessages command to attempt to send the message.
      */
-    public void sendMessage(Account account, Message message, String plaintextSubject, MessagingListener listener) {
+    public void sendMessage(
+        Account account,
+        Message message,
+        String plaintextSubject,
+        MessagingListener listener,
+        String encryptionKey,
+        String digitalSignPrivateKey
+    ) {
         encryptMessage((MimeMessage) message);
 
         try {
+            Log.d("berak", "Encryption Key: " + encryptionKey);
+            Log.d("berak", "Digital Sign Private Key: " + digitalSignPrivateKey);
+
             Log.d("berak", message.getBodyString());
             Log.d("berak", getText(message, "text/html"));
             Log.d("berak", getText(message, "text/plain"));
@@ -1402,7 +1412,7 @@ public class MessagingController {
             OutboxStateRepository outboxStateRepository = localStore.getOutboxStateRepository();
             outboxStateRepository.initializeOutboxState(messageId);
 
-            sendPendingMessages(account, listener);
+//            sendPendingMessages(account, listener);
         } catch (Exception e) {
             Timber.e(e, "Error sending message");
         }
