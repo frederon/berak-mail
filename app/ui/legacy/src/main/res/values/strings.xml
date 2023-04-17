@@ -129,6 +129,7 @@ Please submit bug reports, contribute new features and ask questions at
     <string name="search_results">Search results</string>
     <string name="new_messages_title">New messages</string>
     <string name="preferences_action">Settings</string>
+    <string name="digitalsign_keygen_action">Digital Signature Keygen</string>
     <string name="folders_action">Manage folders</string>
     <string name="account_settings_action">Account settings</string>
     <string name="remove_account_action">Remove account</string>

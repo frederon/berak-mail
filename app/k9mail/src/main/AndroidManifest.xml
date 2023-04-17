@@ -25,6 +25,9 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>
 
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+
     <application
         android:name="com.fsck.k9.App"
         android:allowTaskReparenting="false"
@@ -150,6 +153,10 @@
             android:configChanges="locale"
             android:label="@string/ac_transfer_title"
             />
+
+        <activity
+            android:name=".activity.Keygen"
+            android:label="Digital Signature Key Generator" />
 
         <activity
             android:name=".activity.MessageList"

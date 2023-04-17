@@ -626,6 +626,11 @@ open class MessageList :
         actionDisplaySearch(this, SearchAccount.createUnifiedInboxAccount().relatedSearch, false, false)
     }
 
+    fun openKeygen() {
+        val intent = Intent(this, Keygen::class.java)
+        startActivity(intent)
+    }
+
     fun launchManageFoldersScreen() {
         if (account == null) {
             Timber.e("Tried to open \"Manage folders\", but no account selected!")
