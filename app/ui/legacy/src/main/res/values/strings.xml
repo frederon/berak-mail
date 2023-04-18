@@ -1349,4 +1349,8 @@ You can keep this message and use it as a backup for your secret key. If you wan
     <string name="message_compose_encryption_key_hint">Encryption Key</string>
     <string name="message_compose_digitalsign_key_hint">Digital Signature Private Key</string>
     <string name="file_digitalsign_private_key">Select File for Digital Signature Private Key</string>
+    <string name="message_content_digitalsign_key_hint">Digital Signature Public Key</string>
+    <string name="decrypt">Decrypt</string>
+    <string name="verify_digital_signature">Verify Digital Signature</string>
+    <string name="file_digitalsign_public_key">Select File for Digital Signature Public Key</string>
 </resources>

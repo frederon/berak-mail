@@ -72,4 +72,52 @@
         android:layout_height="wrap_content"
         android:orientation="vertical" />
 
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical">
+
+        <EditText
+            android:id="@+id/c_encryption_key"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="top"
+            android:hint="@string/message_compose_encryption_key_hint"
+            android:imeOptions="flagNoExtractUi"
+            android:inputType="textMultiLine|textAutoCorrect|textCapSentences"
+            android:minLines="0"
+            android:textAppearance="?android:attr/textAppearanceMedium"
+            android:visibility="visible" />
+
+        <Button
+            android:id="@+id/c_btn_decrypt"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/decrypt" />
+
+        <EditText
+            android:id="@+id/c_digitalsign_private_key"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="top"
+            android:hint="@string/message_content_digitalsign_key_hint"
+            android:imeOptions="flagNoExtractUi"
+            android:inputType="textMultiLine|textAutoCorrect|textCapSentences"
+            android:minLines="0"
+            android:textAppearance="?android:attr/textAppearanceMedium"
+            android:visibility="visible" />
+
+        <Button
+            android:id="@+id/c_btn_verify"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/verify_digital_signature" />
+
+        <Button
+            android:id="@+id/c_btn_file_digitalkey_public_key"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/file_digitalsign_public_key" />
+    </LinearLayout>
+
 </com.fsck.k9.ui.messageview.MessageContainerView>
