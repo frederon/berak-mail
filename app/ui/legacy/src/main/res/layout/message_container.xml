@@ -73,6 +73,7 @@
         android:orientation="vertical" />
 
     <LinearLayout
+        android:id="@+id/c_layout"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:orientation="vertical">
@@ -96,7 +97,7 @@
             android:text="@string/decrypt" />
 
         <EditText
-            android:id="@+id/c_digitalsign_private_key"
+            android:id="@+id/c_digitalsign_public_key"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:gravity="top"

@@ -1,5 +1,6 @@
 package com.fsck.k9.ui.messageview
 
+import android.app.Activity
 import android.app.DownloadManager
 import android.content.ActivityNotFoundException
 import android.content.Context
@@ -18,12 +19,17 @@ import android.view.View.OnCreateContextMenuListener
 import android.view.ViewGroup
 import android.webkit.WebView
 import android.webkit.WebView.HitTestResult
+import android.widget.Button
+import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.app.ShareCompat.IntentBuilder
 import androidx.core.view.isGone
 import androidx.core.view.isVisible
+import androidx.fragment.app.FragmentActivity
+import com.fsck.k9.activity.MessageCompose
 import com.fsck.k9.contact.ContactIntentHelper
 import com.fsck.k9.helper.ClipboardManager
 import com.fsck.k9.helper.Utility
@@ -39,11 +45,14 @@ import com.fsck.k9.view.WebViewConfigProvider
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 import org.koin.core.qualifier.named
+import timber.log.Timber
 
 class MessageContainerView(context: Context, attrs: AttributeSet?) :
     LinearLayout(context, attrs),
     OnCreateContextMenuListener,
     KoinComponent {
+
+    private val activity = context as? FragmentActivity
 
     private val displayHtml: DisplayHtml by inject(named("MessageView"))
     private val webViewConfigProvider: WebViewConfigProvider by inject()
@@ -65,9 +74,38 @@ class MessageContainerView(context: Context, attrs: AttributeSet?) :
     private var attachmentCallback: AttachmentViewCallback? = null
     private var currentAttachmentResolver: AttachmentResolver? = null
 
+    private val REQUEST_CODE_PICK_PUBLIC_KEY_FILE = 1
+
     @get:JvmName("hasHiddenExternalImages")
     var hasHiddenExternalImages = false
         private set
+
+    private fun updateDigitalSignatureComponentsVisibility() {
+        // Regex pattern to match <ds>...</ds> with any content in between
+        val pattern = "<ds>.*?</ds>".toRegex()
+
+        // Check if the pattern is found in currentHtmlText
+        val digitalSignComponentsVisibility = if (pattern.containsMatchIn(currentHtmlText ?: "")) View.VISIBLE else View.GONE
+
+        findViewById<EditText>(R.id.c_digitalsign_public_key)?.visibility = digitalSignComponentsVisibility
+        findViewById<Button>(R.id.c_btn_verify)?.visibility = digitalSignComponentsVisibility
+        findViewById<Button>(R.id.c_btn_file_digitalkey_public_key)?.visibility = digitalSignComponentsVisibility
+    }
+
+    private val filePickerLauncher = activity?.registerForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
+        uri?.let {
+            val content = readTextFromUri(uri)
+            findViewById<EditText>(R.id.c_digitalsign_public_key)?.setText(content)
+        }
+    }
+
+    private fun openFilePicker() {
+        filePickerLauncher?.launch("text/plain")
+    }
+
+    private fun readTextFromUri(uri: Uri): String {
+        return activity?.contentResolver?.openInputStream(uri)?.bufferedReader().use { it?.readText() ?: "" } ?: ""
+    }
 
     public override fun onFinishInflate() {
         super.onFinishInflate()
@@ -87,6 +125,20 @@ class MessageContainerView(context: Context, attrs: AttributeSet?) :
         unsignedTextContainer = findViewById(R.id.message_unsigned_container)
         unsignedTextDivider = findViewById(R.id.message_unsigned_divider)
         unsignedText = findViewById(R.id.message_unsigned_text)
+
+        // Berak stuff
+        updateDigitalSignatureComponentsVisibility()
+
+        val decryptButton: Button? = findViewById(R.id.c_btn_decrypt)
+        decryptButton?.setOnClickListener {
+            Timber.tag("berak").d("Decrypting...")
+            currentHtmlText = "This is the new content for the message.<ds>aaaaaaaaa</ds>"
+            refreshDisplayedContent()
+        }
+
+        findViewById<Button>(R.id.c_btn_file_digitalkey_public_key)?.apply {
+            setOnClickListener { openFilePicker() }
+        }
     }
 
     override fun onCreateContextMenu(menu: ContextMenu, view: View, menuInfo: ContextMenuInfo?) {
@@ -425,6 +477,7 @@ class MessageContainerView(context: Context, attrs: AttributeSet?) :
         currentHtmlText = htmlText
         currentAttachmentResolver = attachmentResolver
         messageContentView.displayHtmlContentWithInlineAttachments(htmlText, attachmentResolver, onPageFinishedListener)
+        updateDigitalSignatureComponentsVisibility()
     }
 
     private fun refreshDisplayedContent() {
@@ -435,6 +488,7 @@ class MessageContainerView(context: Context, attrs: AttributeSet?) :
             attachmentResolver = currentAttachmentResolver,
             onPageFinishedListener = null,
         )
+        updateDigitalSignatureComponentsVisibility()
     }
 
     private fun clearDisplayedContent() {
@@ -506,6 +560,7 @@ class MessageContainerView(context: Context, attrs: AttributeSet?) :
          * is now hidden.
          */
         clearDisplayedContent()
+        updateDigitalSignatureComponentsVisibility()
     }
 
     fun refreshAttachmentThumbnail(attachment: AttachmentViewInfo) {
