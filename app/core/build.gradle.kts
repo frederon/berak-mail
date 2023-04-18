@@ -28,6 +28,9 @@ dependencies {
     implementation(libs.mime4j.core)
     implementation(libs.mime4j.dom)
 
+    implementation(libs.okhttp)
+    implementation(libs.activityKtx)
+
     testApi(projects.core.testing)
     testImplementation(projects.mail.testing)
     testImplementation(projects.backend.imap)

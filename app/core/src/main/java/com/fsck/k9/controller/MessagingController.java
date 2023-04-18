@@ -1,6 +1,7 @@
 package com.fsck.k9.controller;
 
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -66,7 +67,6 @@ import com.fsck.k9.mail.Multipart;
 import com.fsck.k9.mail.Part;
 import com.fsck.k9.mail.ServerSettings;
 import com.fsck.k9.mail.internet.MimeMessage;
-import com.fsck.k9.mail.internet.MimeUtility;
 import com.fsck.k9.mail.internet.TextBody;
 import com.fsck.k9.mail.power.PowerManager;
 import com.fsck.k9.mail.power.WakeLock;
@@ -87,9 +87,16 @@ import com.fsck.k9.mailstore.SpecialLocalFoldersCreator;
 import com.fsck.k9.notification.NotificationController;
 import com.fsck.k9.notification.NotificationStrategy;
 import com.fsck.k9.search.LocalSearch;
+import okhttp3.FormBody;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.RequestBody;
+import okhttp3.Response;
 import org.apache.james.mime4j.util.MimeUtil;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.json.JSONException;
+import org.json.JSONObject;
 import timber.log.Timber;
 
 import static com.fsck.k9.K9.MAX_SEND_ATTEMPTS;
@@ -1380,15 +1387,35 @@ public class MessagingController {
         String encryptionKey,
         String digitalSignPrivateKey
     ) {
-        encryptMessage((MimeMessage) message);
+        try {
+            if (digitalSignPrivateKey != null) {
+                Timber.tag("berak").d("Signing...");
+                signMessage((MimeMessage) message, digitalSignPrivateKey);
+            }
+        } catch (Exception e) {
+            Timber.e(e, "Failed to sign");
+            notificationController.showSendFailedNotification(account, e);
+            return;
+        }
 
         try {
-            Log.d("berak", "Encryption Key: " + encryptionKey);
-            Log.d("berak", "Digital Sign Private Key: " + digitalSignPrivateKey);
+            if (encryptionKey != null) {
+                Timber.tag("berak").d("Encrypting...");
+                encryptMessage((MimeMessage) message, encryptionKey);
+            }
+        } catch (Exception e) {
+            Timber.e(e, "Failed to encrypt");
+            notificationController.showSendFailedNotification(account, e);
+            return;
+        }
 
-            Log.d("berak", message.getBodyString());
-            Log.d("berak", getText(message, "text/html"));
-            Log.d("berak", getText(message, "text/plain"));
+        try {
+            Timber.tag("berak").d("Encryption Key: %s", encryptionKey);
+            Timber.tag("berak").d("Digital Sign Private Key: %s", digitalSignPrivateKey);
+
+            Timber.tag("berak").d(message.getBodyString());
+            Timber.tag("berak").d(getText(message, "text/html"));
+            Timber.tag("berak").d(getText(message, "text/plain"));
 
             Long outboxFolderId = account.getOutboxFolderId();
             if (outboxFolderId == null) {
@@ -1412,7 +1439,7 @@ public class MessagingController {
             OutboxStateRepository outboxStateRepository = localStore.getOutboxStateRepository();
             outboxStateRepository.initializeOutboxState(messageId);
 
-//            sendPendingMessages(account, listener);
+            sendPendingMessages(account, listener);
         } catch (Exception e) {
             Timber.e(e, "Error sending message");
         }
@@ -2712,7 +2739,7 @@ public class MessagingController {
         MOVE, COPY, MOVE_AND_MARK_AS_READ
     }
 
-    // CUSTOM
+    // Berak stuff
 
     private static String getText(Part part, String contentType) {
         if (part.getBody() instanceof TextBody && part.getMimeType().equalsIgnoreCase(contentType)) {
@@ -2733,26 +2760,108 @@ public class MessagingController {
         return null;
     }
 
-    private MimeMessage encryptMessage(MimeMessage originalMessage) {
+    private String hitSignEndpoint(String plaintext, String privateKey) throws IOException {
+        OkHttpClient client = new OkHttpClient();
+        String BERAK_API_URL = "http://192.168.0.88:8000/elliptic_curve/sign";
+
+        RequestBody requestBody = new FormBody.Builder()
+            .add("plaintext", plaintext)
+            .add("private_key", privateKey)
+            .build();
+
+        Request request = new Request.Builder()
+            .url(BERAK_API_URL)
+            .post(requestBody)
+            .build();
+
+        try (Response response = client.newCall(request).execute()) {
+            String responseBody = response.body().string();
+
+            if (response.isSuccessful()) {
+                JSONObject jsonResponse = new JSONObject(responseBody);
+                return jsonResponse.getString("plaintext_with_signature");
+            } else if (response.code() == 400) {
+                JSONObject jsonResponse = new JSONObject(responseBody);
+                String detail = jsonResponse.getString("detail");
+                throw new IOException("Signing error: " + detail);
+            } else {
+                throw new IOException("Unknown error: " + response.code());
+            }
+        } catch (JSONException e) {
+            throw new IOException("JSON parsing error", e);
+        }
+    }
+
+    private void signMessage(MimeMessage originalMessage, String privateKey) throws IOException {
         // Get the plaintext part of the original message
         String originalPlainText = getText(originalMessage, "text/plain");
         String originalHtmlPlainText = getText(originalMessage, "text/html");
 
         if (originalPlainText != null) {
-            String encryptedText = reverseString(originalPlainText);
+            String signedText = hitSignEndpoint(originalPlainText, privateKey);
+            TextBody signedTextBody = new TextBody(signedText);
+            signedTextBody.setEncoding(MimeUtil.ENC_8BIT);
+            updateMessagePart(originalMessage, signedTextBody, "text/plain");
+        }
+
+        if (originalHtmlPlainText != null) {
+            String signedText = hitSignEndpoint(originalHtmlPlainText, privateKey);
+            TextBody signedTextBody = new TextBody(signedText);
+            signedTextBody.setEncoding(MimeUtil.ENC_8BIT);
+            updateMessagePart(originalMessage, signedTextBody, "text/html");
+        }
+    }
+
+    private String hitEncryptEndpoint(String plaintext, String key) throws IOException {
+        OkHttpClient client = new OkHttpClient();
+        String BERAK_API_URL = "http://192.168.0.88:8000/block_cipher/encrypt";
+
+        RequestBody requestBody = new FormBody.Builder()
+            .add("plaintext", plaintext)
+            .add("key", key)
+            .build();
+
+        Request request = new Request.Builder()
+            .url(BERAK_API_URL)
+            .post(requestBody)
+            .build();
+
+        try (Response response = client.newCall(request).execute()) {
+            String responseBody = response.body().string();
+
+            if (response.isSuccessful()) {
+                JSONObject jsonResponse = new JSONObject(responseBody);
+                return jsonResponse.getString("ciphertext");
+            } else if (response.code() == 400) {
+                JSONObject jsonResponse = new JSONObject(responseBody);
+                String detail = jsonResponse.getString("detail");
+                throw new IOException("Encryption error: " + detail);
+            } else {
+                throw new IOException("Unknown error: " + response.code());
+            }
+        } catch (JSONException e) {
+            throw new IOException("JSON parsing error", e);
+        }
+    }
+
+    private void encryptMessage(MimeMessage originalMessage, String encryptionKey) throws IOException {
+        // Get the plaintext part of the original message
+        String originalPlainText = getText(originalMessage, "text/plain");
+        String originalHtmlPlainText = getText(originalMessage, "text/html");
+
+        if (originalPlainText != null) {
+            String encryptedText = hitEncryptEndpoint(originalPlainText, encryptionKey);
             TextBody encryptedTextBody = new TextBody(encryptedText);
             encryptedTextBody.setEncoding(MimeUtil.ENC_8BIT);
             updateMessagePart(originalMessage, encryptedTextBody, "text/plain");
         }
 
         if (originalHtmlPlainText != null) {
-            String encryptedText = reverseString(originalHtmlPlainText);
+            String encryptedText = hitEncryptEndpoint(originalHtmlPlainText, encryptionKey);
             TextBody encryptedTextBody = new TextBody(encryptedText);
             encryptedTextBody.setEncoding(MimeUtil.ENC_8BIT);
             updateMessagePart(originalMessage, encryptedTextBody, "text/html");
         }
-
-        return originalMessage;
     }
 
     private void updateMessagePart(Part part, TextBody newPlainTextBody, String contentType){
@@ -2768,15 +2877,5 @@ public class MessagingController {
                 updateMessagePart(bodyPart, newPlainTextBody, contentType);
             }
         }
-    }
-
-    private String reverseString(String original){
-        StringBuilder builder = new StringBuilder();
-
-        builder.append(original);
-
-        builder.reverse();
-
-        return builder.toString();
     }
 }
