@@ -89,6 +89,10 @@ public class Keygen extends K9Activity {
             .url(BERAK_API_URL)
             .build();
 
+        runOnUiThread(() ->
+            Toast.makeText(Keygen.this, "Generating key...",
+                Toast.LENGTH_SHORT).show());
+
         client.newCall(request).enqueue(new Callback() {
             @Override
             public void onResponse(@NonNull Call call, @NonNull Response response) throws IOException {
@@ -103,14 +107,18 @@ public class Keygen extends K9Activity {
                         e.printStackTrace();
                     }
                 } else {
-                    Toast.makeText(Keygen.this, "Failed to get response from Generate Key API",
-                        Toast.LENGTH_SHORT).show();
+                    runOnUiThread(() ->
+                        Toast.makeText(Keygen.this, "Failed to get response from Generate Key API",
+                            Toast.LENGTH_SHORT).show());
                 }
             }
 
             @Override
             public void onFailure(@NonNull Call call, @NonNull IOException e) {
                 e.printStackTrace();
+                runOnUiThread(() ->
+                    Toast.makeText(Keygen.this, "Failed to get response from Generate Key API",
+                        Toast.LENGTH_SHORT).show());
             }
         });
     }
@@ -121,8 +129,9 @@ public class Keygen extends K9Activity {
         if (VERSION.SDK_INT >= VERSION_CODES.O) {
             launcher.launch(createFileSaveIntent(fileName));
         } else {
-            Toast.makeText(Keygen.this, "Saving to files require a minimum of API level 26",
-                Toast.LENGTH_SHORT).show();
+            runOnUiThread(() ->
+                Toast.makeText(Keygen.this, "Saving to files require a minimum of API level 26",
+                    Toast.LENGTH_SHORT).show());
         }
     }
 
