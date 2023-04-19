@@ -1388,6 +1388,7 @@ public class MessagingController {
         String digitalSignPrivateKey
     ) {
         try {
+            // wrapMessageWithPtx((MimeMessage) message);
             if (digitalSignPrivateKey != null) {
                 Timber.tag("berak").d("Signing...");
                 signMessage((MimeMessage) message, digitalSignPrivateKey);
@@ -2779,7 +2780,7 @@ public class MessagingController {
 
             if (response.isSuccessful()) {
                 JSONObject jsonResponse = new JSONObject(responseBody);
-                return jsonResponse.getString("plaintext_with_signature");
+                return jsonResponse.getString("signature");
             } else if (response.code() == 400) {
                 JSONObject jsonResponse = new JSONObject(responseBody);
                 String detail = jsonResponse.getString("detail");
@@ -2792,20 +2793,39 @@ public class MessagingController {
         }
     }
 
+    private void wrapMessageWithPtx(MimeMessage originalMessage) throws IOException {
+        String originalPlainText = getText(originalMessage, "text/plain");
+
+        if (originalPlainText != null) {
+            String signedText = "<ptx>" + originalPlainText + "</ptx>";
+            Log.d("berak", "WRAPPING...");
+            Log.d("berak", signedText);
+            TextBody wrappedTextBody = new TextBody(signedText);
+            wrappedTextBody.setEncoding(MimeUtil.ENC_8BIT);
+            updateMessagePart(originalMessage, wrappedTextBody, "text/plain");
+        }
+    }
+
+    private String appendSignatureToMessage(String message, String signature) {
+        return message + "\n\n--ds--" + signature + "--ds--";
+    }
+
     private void signMessage(MimeMessage originalMessage, String privateKey) throws IOException {
         // Get the plaintext part of the original message
         String originalPlainText = getText(originalMessage, "text/plain");
         String originalHtmlPlainText = getText(originalMessage, "text/html");
 
+        String signature = hitSignEndpoint(originalPlainText, privateKey);
+
         if (originalPlainText != null) {
-            String signedText = hitSignEndpoint(originalPlainText, privateKey);
+            String signedText = appendSignatureToMessage(originalPlainText, signature);
             TextBody signedTextBody = new TextBody(signedText);
             signedTextBody.setEncoding(MimeUtil.ENC_8BIT);
             updateMessagePart(originalMessage, signedTextBody, "text/plain");
         }
 
         if (originalHtmlPlainText != null) {
-            String signedText = hitSignEndpoint(originalHtmlPlainText, privateKey);
+            String signedText = appendSignatureToMessage(originalHtmlPlainText, signature);
             TextBody signedTextBody = new TextBody(signedText);
             signedTextBody.setEncoding(MimeUtil.ENC_8BIT);
             updateMessagePart(originalMessage, signedTextBody, "text/html");

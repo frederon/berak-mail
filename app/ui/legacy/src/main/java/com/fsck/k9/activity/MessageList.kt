@@ -67,6 +67,7 @@ import com.fsck.k9.ui.onboarding.OnboardingActivity
 import com.fsck.k9.ui.permissions.K9PermissionUiHelper
 import com.fsck.k9.ui.permissions.Permission
 import com.fsck.k9.ui.permissions.PermissionUiHelper
+import com.fsck.k9.view.MessageWebView
 import com.fsck.k9.view.ViewSwitcher
 import com.fsck.k9.view.ViewSwitcher.OnSwitchCompleteListener
 import com.mikepenz.materialdrawer.util.getOptimalDrawerWidth
@@ -238,6 +239,13 @@ open class MessageList :
                 }
             }
         }
+
+//        val messageWebView = findViewById<MessageWebView>(R.id.message_content)
+//        val contentMatcher = Regex("<body><div dir=\"auto\">(.*)</div></body>", RegexOption.MULTILINE)
+//        val matches = contentMatcher.find(messageWebView.)
+//
+//        Timber.tag("berak").d("update in MessageList")
+//        Timber.tag("berak").d(matches.toString())
     }
 
     private fun readTextFromUri(uri: Uri): String {

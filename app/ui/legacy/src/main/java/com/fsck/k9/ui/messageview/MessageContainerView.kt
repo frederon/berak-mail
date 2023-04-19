@@ -39,7 +39,8 @@ import com.fsck.k9.view.MessageWebView
 import com.fsck.k9.view.MessageWebView.OnPageFinishedListener
 import com.fsck.k9.view.WebViewConfigProvider
 import java.io.IOException
-import java.security.PublicKey
+import java.util.regex.Matcher
+import java.util.regex.Pattern
 import okhttp3.FormBody
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -78,8 +79,6 @@ class MessageContainerView(context: Context, attrs: AttributeSet?) :
     private var attachmentCallback: AttachmentViewCallback? = null
     private var currentAttachmentResolver: AttachmentResolver? = null
 
-    private val REQUEST_CODE_PICK_PUBLIC_KEY_FILE = 1
-
     @get:JvmName("hasHiddenExternalImages")
     var hasHiddenExternalImages = false
         private set
@@ -89,15 +88,36 @@ class MessageContainerView(context: Context, attrs: AttributeSet?) :
         fun onFilePickerRequested(callback: (String) -> Unit)
     }
 
+    private fun extractContent(input: String?): String? {
+         val pattern: Pattern = Pattern.compile("<div dir=\"auto\">(.*?)</div>")
+//        val pattern: Pattern = Pattern.compile("<body>(.*?)</body>")
+        val matcher: Matcher = pattern.matcher(input.toString())
+        return if (matcher.find()) {
+            matcher.group(1)
+        } else ""
+    }
+
+    private fun extractDigitalSignature(input: String?): String? {
+        val pattern: Pattern = Pattern.compile("--ds--(.*?)--ds--")
+        val matcher: Matcher = pattern.matcher(input.toString())
+        return if (matcher.find()) {
+            matcher.group(1)
+        } else ""
+    }
+
+    private fun buildContent(input: String?): String {
+        return """
+            <html><head><meta name="viewport" content="width=device-width"><style type="text/css"> pre.k9mail {white-space: pre-wrap; word-wrap:break-word; font-family: sans-serif; margin-top: 0px}</style><style type="text/css">.k9mail-signature { opacity: 0.5 }</style></head><body><pre class="k9mail"><div dir="auto">
+        """ + input + """
+            </div></pre></body></html>
+        """.trimIndent()
+    }
+
     private fun updateDigitalSignatureComponentsVisibility() {
-        // Regex pattern to match <ds>...</ds> with any content in between
-        val pattern = "<ds>.*?</ds>".toRegex()
+        val signature = extractDigitalSignature(currentHtmlText)
+        val extractedContent = extractContent(currentHtmlText)
 
-        Timber.tag("berak").d("update")
-        Timber.tag("berak").d(currentHtmlText)
-
-        // Check if the pattern is found in currentHtmlText
-        val digitalSignComponentsVisibility = if (pattern.containsMatchIn(currentHtmlText ?: "")) View.VISIBLE else View.GONE
+        val digitalSignComponentsVisibility = if (signature != "") View.VISIBLE else View.GONE
 
         findViewById<EditText>(R.id.c_digitalsign_public_key)?.visibility = digitalSignComponentsVisibility
         findViewById<Button>(R.id.c_btn_verify)?.visibility = digitalSignComponentsVisibility
@@ -149,7 +169,7 @@ class MessageContainerView(context: Context, attrs: AttributeSet?) :
     private fun decryptMessage(ciphertext: String, key: String) {
        try {
            val decryptedMessage = hitDecryptEndpoint(ciphertext, key)
-           currentHtmlText = decryptedMessage
+           currentHtmlText = buildContent(decryptedMessage)
            refreshDisplayedContent()
        } catch (e: Exception) {
            Timber.tag("berak").e(e, "Failed to decrypt")
@@ -161,11 +181,17 @@ class MessageContainerView(context: Context, attrs: AttributeSet?) :
     }
 
     @Throws(IOException::class)
-    private fun hitVerifyEndpoint(plaintext: String, publicKey: String): Boolean? {
+    private fun hitVerifyEndpoint(plaintext: String, signature: String, publicKey: String): Boolean? {
+        Timber.tag("berak").d("hitVerifyEndpoint")
+        Timber.tag("berak").d(plaintext)
+        Timber.tag("berak").d(signature)
+        Timber.tag("berak").d(publicKey)
+
         val client = OkHttpClient()
         val BERAK_API_URL = "http://192.168.0.88:8000/elliptic_curve/verify"
         val requestBody: RequestBody = FormBody.Builder()
-            .add("plaintext_with_signature", plaintext)
+            .add("plaintext", plaintext)
+            .add("signature_base64", signature)
             .add("public_key", publicKey)
             .build()
         val request: Request = Request.Builder()
@@ -191,9 +217,9 @@ class MessageContainerView(context: Context, attrs: AttributeSet?) :
         }
     }
 
-    private fun verifyMessage(plaintext: String, publicKey: String) {
+    private fun verifyMessage(plaintext: String, signature: String, publicKey: String) {
         try {
-            val isVerified = hitVerifyEndpoint(plaintext, publicKey)
+            val isVerified = hitVerifyEndpoint(plaintext, signature, publicKey)
             if (isVerified == true) {
                 Toast.makeText(
                     context, "Message verified",
@@ -245,14 +271,21 @@ class MessageContainerView(context: Context, attrs: AttributeSet?) :
         decryptButton?.setOnClickListener {
             Timber.tag("berak").d("Decrypting...")
             val cEncryptionKey = findViewById<EditText>(R.id.c_encryption_key)
-            decryptMessage(currentHtmlText!!, cEncryptionKey.text.toString())
+            val extractedContent = extractContent(currentHtmlText)
+            Timber.tag("berak").d(extractedContent)
+            //decryptMessage(extractedContent!!, cEncryptionKey.text.toString())
         }
 
         val verifyButton: Button? = findViewById(R.id.c_btn_verify)
         verifyButton?.setOnClickListener {
             Timber.tag("berak").d("Verifying...")
+            Timber.tag("berak").d(currentHtmlText)
             val cPublicKey = findViewById<EditText>(R.id.c_digitalsign_public_key)
-            verifyMessage(currentHtmlText!!, cPublicKey.text.toString())
+
+            val extractedContent = extractContent(currentHtmlText)
+            val signature = extractDigitalSignature(currentHtmlText)
+
+            verifyMessage(extractedContent!!, signature!!, cPublicKey.text.toString())
         }
 
         findViewById<Button>(R.id.c_btn_file_digitalkey_public_key)?.apply {
@@ -571,6 +604,9 @@ class MessageContainerView(context: Context, attrs: AttributeSet?) :
                 }
             }
         }
+
+        Timber.tag("berak").d("messageText HEHEHE")
+        Timber.tag("berak").d(messageText)
 
         val textToDisplay = messageText
             ?: displayHtml.wrapStatusMessage(context.getString(R.string.webview_empty_message))
