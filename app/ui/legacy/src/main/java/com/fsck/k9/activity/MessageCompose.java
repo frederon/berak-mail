@@ -920,10 +920,17 @@ public class MessageCompose extends K9Activity implements OnClickListener,
             if (inputStream != null) {
                 BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream));
                 StringBuilder content = new StringBuilder();
-                String line;
 
+                String line;
+                String previousLine = null;
                 while ((line = reader.readLine()) != null) {
-                    content.append(line).append('\n');
+                    if (previousLine != null) {
+                        content.append(previousLine).append("\n");
+                    }
+                    previousLine = line;
+                }
+                if (previousLine != null) {
+                    content.append(previousLine);
                 }
 
                 reader.close();
