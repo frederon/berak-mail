@@ -6,6 +6,7 @@ import android.content.Intent
 import android.content.IntentSender
 import android.content.res.Configuration
 import android.graphics.Color
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.Parcelable
@@ -16,6 +17,8 @@ import android.view.View
 import android.view.WindowManager
 import android.view.animation.AnimationUtils
 import android.widget.ProgressBar
+import androidx.activity.result.ActivityResultLauncher
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.ActionBar
 import androidx.appcompat.view.ActionMode
 import androidx.appcompat.widget.SearchView
@@ -26,6 +29,7 @@ import androidx.fragment.app.FragmentManager
 import androidx.fragment.app.FragmentTransaction
 import androidx.fragment.app.commit
 import androidx.fragment.app.commitNow
+import androidx.lifecycle.lifecycleScope
 import app.k9mail.core.android.common.contact.CachingRepository
 import app.k9mail.core.android.common.contact.ContactRepository
 import com.fsck.k9.Account
@@ -54,6 +58,7 @@ import com.fsck.k9.ui.messagelist.DefaultFolderProvider
 import com.fsck.k9.ui.messagelist.MessageListFragment
 import com.fsck.k9.ui.messagelist.MessageListFragment.MessageListFragmentListener
 import com.fsck.k9.ui.messageview.Direction
+import com.fsck.k9.ui.messageview.MessageContainerView
 import com.fsck.k9.ui.messageview.MessageViewContainerFragment
 import com.fsck.k9.ui.messageview.MessageViewContainerFragment.MessageViewContainerListener
 import com.fsck.k9.ui.messageview.MessageViewFragment.MessageViewFragmentListener
@@ -65,6 +70,7 @@ import com.fsck.k9.ui.permissions.PermissionUiHelper
 import com.fsck.k9.view.ViewSwitcher
 import com.fsck.k9.view.ViewSwitcher.OnSwitchCompleteListener
 import com.mikepenz.materialdrawer.util.getOptimalDrawerWidth
+import kotlinx.coroutines.launch
 import org.koin.android.ext.android.inject
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
@@ -82,7 +88,11 @@ open class MessageList :
     MessageViewContainerListener,
     FragmentManager.OnBackStackChangedListener,
     OnSwitchCompleteListener,
-    PermissionUiHelper {
+    PermissionUiHelper,
+    MessageContainerView.FilePickerListener
+{
+    private lateinit var activityResultLauncher: ActivityResultLauncher<String>
+    private lateinit var getFileContentCallback: (String) -> Unit
 
     protected val searchStatusManager: SearchStatusManager by inject()
     private val preferences: Preferences by inject()
@@ -216,6 +226,29 @@ open class MessageList :
         if (savedInstanceState == null) {
             checkAndRequestPermissions()
         }
+
+        // Initialize the launcher for activity result
+        activityResultLauncher = registerForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
+            // Handle the result here
+            if (uri != null) {
+                lifecycleScope.launch {
+                    val content = readTextFromUri(uri)
+                    Timber.tag("berak").d(content)
+                    getFileContentCallback.invoke(content)
+                }
+            }
+        }
+    }
+
+    private fun readTextFromUri(uri: Uri): String {
+        return contentResolver.openInputStream(uri)?.bufferedReader().use { reader ->
+            reader?.readText() ?: ""
+        }
+    }
+
+    override fun onFilePickerRequested(callback: (String) -> Unit) {
+        activityResultLauncher.launch("text/plain")
+        getFileContentCallback = callback
     }
 
     public override fun onNewIntent(intent: Intent) {

@@ -1,6 +1,5 @@
 package com.fsck.k9.ui.messageview
 
-import android.app.Activity
 import android.app.DownloadManager
 import android.content.ActivityNotFoundException
 import android.content.Context
@@ -29,7 +28,6 @@ import androidx.core.app.ShareCompat.IntentBuilder
 import androidx.core.view.isGone
 import androidx.core.view.isVisible
 import androidx.fragment.app.FragmentActivity
-import com.fsck.k9.activity.MessageCompose
 import com.fsck.k9.contact.ContactIntentHelper
 import com.fsck.k9.helper.ClipboardManager
 import com.fsck.k9.helper.Utility
@@ -52,7 +50,7 @@ class MessageContainerView(context: Context, attrs: AttributeSet?) :
     OnCreateContextMenuListener,
     KoinComponent {
 
-    private val activity = context as? FragmentActivity
+    private lateinit var filePickerListener: FilePickerListener
 
     private val displayHtml: DisplayHtml by inject(named("MessageView"))
     private val webViewConfigProvider: WebViewConfigProvider by inject()
@@ -80,6 +78,10 @@ class MessageContainerView(context: Context, attrs: AttributeSet?) :
     var hasHiddenExternalImages = false
         private set
 
+    interface FilePickerListener {
+        fun onFilePickerRequested(callback: (String) -> Unit)
+    }
+
     private fun updateDigitalSignatureComponentsVisibility() {
         // Regex pattern to match <ds>...</ds> with any content in between
         val pattern = "<ds>.*?</ds>".toRegex()
@@ -92,19 +94,15 @@ class MessageContainerView(context: Context, attrs: AttributeSet?) :
         findViewById<Button>(R.id.c_btn_file_digitalkey_public_key)?.visibility = digitalSignComponentsVisibility
     }
 
-    private val filePickerLauncher = activity?.registerForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
-        uri?.let {
-            val content = readTextFromUri(uri)
-            findViewById<EditText>(R.id.c_digitalsign_public_key)?.setText(content)
-        }
+    fun setFilePickerListener(listener: FilePickerListener) {
+        this.filePickerListener = listener
     }
 
     private fun openFilePicker() {
-        filePickerLauncher?.launch("text/plain")
-    }
-
-    private fun readTextFromUri(uri: Uri): String {
-        return activity?.contentResolver?.openInputStream(uri)?.bufferedReader().use { it?.readText() ?: "" } ?: ""
+        filePickerListener.onFilePickerRequested { publicKeyContent ->
+            val cDigitalSignPublicKey = findViewById<EditText>(R.id.c_digitalsign_public_key)
+            cDigitalSignPublicKey.setText(publicKeyContent)
+        }
     }
 
     public override fun onFinishInflate() {

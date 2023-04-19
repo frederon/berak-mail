@@ -151,6 +151,7 @@ class MessageViewFragment :
     }
 
     private fun initializeMessageTopView(messageTopView: MessageTopView) {
+        messageTopView.activity = requireActivity()
         messageTopView.setShowAccountChip(showAccountChip)
 
         messageTopView.setAttachmentCallback(this)

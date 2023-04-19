@@ -17,6 +17,7 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.TextView
+import androidx.fragment.app.FragmentActivity
 import app.k9mail.core.android.common.contact.ContactRepository
 import app.k9mail.core.common.mail.EmailAddress
 import com.fsck.k9.Account
@@ -36,6 +37,7 @@ class MessageTopView(
     context: Context,
     attrs: AttributeSet?,
 ) : LinearLayout(context, attrs), KoinComponent {
+    lateinit var activity: FragmentActivity
 
     private val contactRepository: ContactRepository by inject()
 
@@ -119,6 +121,7 @@ class MessageTopView(
             containerView,
             false,
         ) as MessageContainerView
+        (view as? MessageContainerView)?.setFilePickerListener(activity as MessageContainerView.FilePickerListener)
         containerView.addView(view)
 
         val hideUnsignedTextDivider = account.isOpenPgpHideSignOnly
