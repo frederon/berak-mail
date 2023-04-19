@@ -2806,7 +2806,10 @@ public class MessagingController {
         }
     }
 
-    private String appendSignatureToMessage(String message, String signature) {
+    private String appendSignatureToMessage(String message, String signature, Boolean isHTML) {
+        if (isHTML) {
+            return message + "\n\n<p style=\"display:none;\">--ds--" + signature + "--ds--</p>";
+        }
         return message + "\n\n--ds--" + signature + "--ds--";
     }
 
@@ -2818,14 +2821,14 @@ public class MessagingController {
         String signature = hitSignEndpoint(originalPlainText, privateKey);
 
         if (originalPlainText != null) {
-            String signedText = appendSignatureToMessage(originalPlainText, signature);
+            String signedText = appendSignatureToMessage(originalPlainText, signature, false);
             TextBody signedTextBody = new TextBody(signedText);
             signedTextBody.setEncoding(MimeUtil.ENC_8BIT);
             updateMessagePart(originalMessage, signedTextBody, "text/plain");
         }
 
         if (originalHtmlPlainText != null) {
-            String signedText = appendSignatureToMessage(originalHtmlPlainText, signature);
+            String signedText = appendSignatureToMessage(originalHtmlPlainText, signature, true);
             TextBody signedTextBody = new TextBody(signedText);
             signedTextBody.setEncoding(MimeUtil.ENC_8BIT);
             updateMessagePart(originalMessage, signedTextBody, "text/html");
