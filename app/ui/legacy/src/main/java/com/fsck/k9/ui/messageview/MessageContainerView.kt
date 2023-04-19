@@ -267,13 +267,15 @@ class MessageContainerView(context: Context, attrs: AttributeSet?) :
         // Berak stuff
         updateDigitalSignatureComponentsVisibility()
 
+        Timber.tag("berak").d(currentHtmlText)
+
         val decryptButton: Button? = findViewById(R.id.c_btn_decrypt)
         decryptButton?.setOnClickListener {
             Timber.tag("berak").d("Decrypting...")
             val cEncryptionKey = findViewById<EditText>(R.id.c_encryption_key)
-            val extractedContent = extractContent(currentHtmlText)
-            Timber.tag("berak").d(extractedContent)
-            //decryptMessage(extractedContent!!, cEncryptionKey.text.toString())
+//            val extractedContent = extractContent(currentHtmlText)
+            Timber.tag("berak").d(currentHtmlText)
+            decryptMessage(currentHtmlText!!, cEncryptionKey.text.toString())
         }
 
         val verifyButton: Button? = findViewById(R.id.c_btn_verify)

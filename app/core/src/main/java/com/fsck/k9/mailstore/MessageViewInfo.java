@@ -4,7 +4,10 @@ package com.fsck.k9.mailstore;
 import java.util.Collections;
 import java.util.List;
 
+import android.util.Log;
+
 import com.fsck.k9.helper.UnsubscribeUri;
+import com.fsck.k9.logging.Timber;
 import com.fsck.k9.mail.Body;
 import com.fsck.k9.mail.Message;
 import com.fsck.k9.mail.MessagingException;
@@ -48,6 +51,9 @@ public class MessageViewInfo {
         this.extraText = extraText;
         this.extraAttachments = extraAttachments;
         this.preferredUnsubscribeUri = preferredUnsubscribeUri;
+
+        Log.d("berak", "message view info");
+        Log.d("berak", text);
     }
 
     static MessageViewInfo createWithExtractedContent(Message message, Part rootPart, boolean isMessageIncomplete,
