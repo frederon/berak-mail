@@ -23,11 +23,9 @@ import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.app.ShareCompat.IntentBuilder
 import androidx.core.view.isGone
 import androidx.core.view.isVisible
-import androidx.fragment.app.FragmentActivity
 import com.fsck.k9.contact.ContactIntentHelper
 import com.fsck.k9.helper.ClipboardManager
 import com.fsck.k9.helper.Utility
@@ -40,6 +38,14 @@ import com.fsck.k9.ui.R
 import com.fsck.k9.view.MessageWebView
 import com.fsck.k9.view.MessageWebView.OnPageFinishedListener
 import com.fsck.k9.view.WebViewConfigProvider
+import java.io.IOException
+import java.security.PublicKey
+import okhttp3.FormBody
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody
+import org.json.JSONException
+import org.json.JSONObject
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 import org.koin.core.qualifier.named
@@ -78,6 +84,7 @@ class MessageContainerView(context: Context, attrs: AttributeSet?) :
     var hasHiddenExternalImages = false
         private set
 
+    // Berak stuff
     interface FilePickerListener {
         fun onFilePickerRequested(callback: (String) -> Unit)
     }
@@ -85,6 +92,9 @@ class MessageContainerView(context: Context, attrs: AttributeSet?) :
     private fun updateDigitalSignatureComponentsVisibility() {
         // Regex pattern to match <ds>...</ds> with any content in between
         val pattern = "<ds>.*?</ds>".toRegex()
+
+        Timber.tag("berak").d("update")
+        Timber.tag("berak").d(currentHtmlText)
 
         // Check if the pattern is found in currentHtmlText
         val digitalSignComponentsVisibility = if (pattern.containsMatchIn(currentHtmlText ?: "")) View.VISIBLE else View.GONE
@@ -102,6 +112,110 @@ class MessageContainerView(context: Context, attrs: AttributeSet?) :
         filePickerListener.onFilePickerRequested { publicKeyContent ->
             val cDigitalSignPublicKey = findViewById<EditText>(R.id.c_digitalsign_public_key)
             cDigitalSignPublicKey.setText(publicKeyContent)
+        }
+    }
+
+    @Throws(IOException::class)
+    private fun hitDecryptEndpoint(ciphertext: String, key: String): String? {
+        val client = OkHttpClient()
+        val BERAK_API_URL = "http://192.168.0.88:8000/block_cipher/decrypt"
+        val requestBody: RequestBody = FormBody.Builder()
+            .add("ciphertext", ciphertext)
+            .add("key", key)
+            .build()
+        val request: Request = Request.Builder()
+            .url(BERAK_API_URL)
+            .post(requestBody)
+            .build()
+        try {
+            client.newCall(request).execute().use { response ->
+                val responseBody = response.body!!.string()
+                return if (response.isSuccessful) {
+                    val jsonResponse = JSONObject(responseBody)
+                    jsonResponse.getString("plaintext")
+                } else if (response.code == 400) {
+                    val jsonResponse = JSONObject(responseBody)
+                    val detail = jsonResponse.getString("detail")
+                    throw IOException("Decryption error: $detail")
+                } else {
+                    throw IOException("Unknown error: " + response.code)
+                }
+            }
+        } catch (e: JSONException) {
+            throw IOException("JSON parsing error", e)
+        }
+    }
+
+    private fun decryptMessage(ciphertext: String, key: String) {
+       try {
+           val decryptedMessage = hitDecryptEndpoint(ciphertext, key)
+           currentHtmlText = decryptedMessage
+           refreshDisplayedContent()
+       } catch (e: Exception) {
+           Timber.tag("berak").e(e, "Failed to decrypt")
+           Toast.makeText(
+               context, "Failed to decrypt",
+               Toast.LENGTH_SHORT,
+           ).show()
+       }
+    }
+
+    @Throws(IOException::class)
+    private fun hitVerifyEndpoint(plaintext: String, publicKey: String): Boolean? {
+        val client = OkHttpClient()
+        val BERAK_API_URL = "http://192.168.0.88:8000/elliptic_curve/verify"
+        val requestBody: RequestBody = FormBody.Builder()
+            .add("plaintext_with_signature", plaintext)
+            .add("public_key", publicKey)
+            .build()
+        val request: Request = Request.Builder()
+            .url(BERAK_API_URL)
+            .post(requestBody)
+            .build()
+        try {
+            client.newCall(request).execute().use { response ->
+                val responseBody = response.body!!.string()
+                return if (response.isSuccessful) {
+                    val jsonResponse = JSONObject(responseBody)
+                    jsonResponse.getBoolean("verified")
+                } else if (response.code == 400) {
+                    val jsonResponse = JSONObject(responseBody)
+                    val detail = jsonResponse.getString("detail")
+                    throw IOException("Verify digital sign error: $detail")
+                } else {
+                    throw IOException("Unknown error: " + response.code)
+                }
+            }
+        } catch (e: JSONException) {
+            throw IOException("JSON parsing error", e)
+        }
+    }
+
+    private fun verifyMessage(plaintext: String, publicKey: String) {
+        try {
+            val isVerified = hitVerifyEndpoint(plaintext, publicKey)
+            if (isVerified == true) {
+                Toast.makeText(
+                    context, "Message verified",
+                    Toast.LENGTH_SHORT,
+                ).show()
+            } else if (isVerified == false) {
+                Toast.makeText(
+                    context, "Message not verified",
+                    Toast.LENGTH_SHORT,
+                ).show()
+            } else {
+                Toast.makeText(
+                    context, "Failed to verify digital sign",
+                    Toast.LENGTH_SHORT,
+                ).show()
+            }
+        } catch (e: Exception) {
+            Timber.tag("berak").e(e, "Failed to verify digital sign")
+            Toast.makeText(
+                context, "Failed to verify digital sign",
+                Toast.LENGTH_SHORT,
+            ).show()
         }
     }
 
@@ -130,8 +244,15 @@ class MessageContainerView(context: Context, attrs: AttributeSet?) :
         val decryptButton: Button? = findViewById(R.id.c_btn_decrypt)
         decryptButton?.setOnClickListener {
             Timber.tag("berak").d("Decrypting...")
-            currentHtmlText = "This is the new content for the message.<ds>aaaaaaaaa</ds>"
-            refreshDisplayedContent()
+            val cEncryptionKey = findViewById<EditText>(R.id.c_encryption_key)
+            decryptMessage(currentHtmlText!!, cEncryptionKey.text.toString())
+        }
+
+        val verifyButton: Button? = findViewById(R.id.c_btn_verify)
+        verifyButton?.setOnClickListener {
+            Timber.tag("berak").d("Verifying...")
+            val cPublicKey = findViewById<EditText>(R.id.c_digitalsign_public_key)
+            verifyMessage(currentHtmlText!!, cPublicKey.text.toString())
         }
 
         findViewById<Button>(R.id.c_btn_file_digitalkey_public_key)?.apply {
